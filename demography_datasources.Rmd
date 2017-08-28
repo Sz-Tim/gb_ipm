@@ -1,0 +1,93 @@
+str---
+title: "IPM Datasets"
+author: "Tim Szewczyk"
+date: "8/21/2017"
+output: html_document
+---
+
+This RMarkdown file summarizes the various demographic datasources that will inform the glossy buckthorn IPM. The bulk of the data come from Tom Lee's field and lab experiments or from Matt Aiello-Lammens' dissertation chapter where he constructed a glossy buckthorn IPM using various field measurements and literature-based assumptions. The current plan is to vary justified vital rates based on landcover type (developed, deciduous, mixed, evergreen, white pine, other). 
+
+```{r setup, include=FALSE}
+library(sevcheck); library(tidyverse); theme_set(theme_bw()); library(magrittr)
+tom_height <- read_csv("data/tom_surv_fruit.csv")
+tom_emerge <- read_csv("data/tom_emerge.csv")
+tom_germ <- read_csv("data/tom_germ.csv")
+```
+
+# Germination rates  
+## Tom Lee: Lab experiment with temperature treatments  
+```{r germination}
+ggplot(tom_germ, aes(x=Treatment, y=propGerm)) + geom_violin()
+summary(glm(cbind(tom_germ$propGerm*25, (1-tom_germ$propGerm)*25) ~
+              tom_germ$Treatment, family="binomial"))
+summary(aov(glm(cbind(tom_germ$propGerm*25, (1-tom_germ$propGerm)*25) ~
+              tom_germ$Treatment, family="binomial")))
+TukeyHSD(aov(logit(tom_germ$propGerm + 0.001) ~ tom_germ$Treatment))
+tom_germ %>% group_by(Treatment) %>% 
+  summarise(mnGerm=mean(propGerm), mdGerm=median(propGerm), sdGerm=sd(propGerm),
+            minGerm=min(propGerm), maxGerm=max(propGerm))
+```
+
+# Emergence rates  
+## Tom Lee: Field experiment with litter treatments  
+```{r emergence}
+ggplot(tom_emerge, aes(x=Treatment, y=propEmerge)) + geom_violin()
+summary(glm(cbind(tom_emerge$nSeedlings, (200-tom_emerge$nSeedlings)) ~
+              tom_emerge$Treatment, family="binomial"))
+summary(aov(glm(cbind(tom_emerge$nSeedlings, (200-tom_emerge$nSeedlings)) ~
+            tom_emerge$Treatment, family="binomial")))
+TukeyHSD(aov(logit(tom_emerge$propEmerge) ~ tom_emerge$Treatment))
+tom_emerge %>% group_by(Treatment) %>% 
+  summarise(mnEmerge=mean(propEmerge), mdEmerge=median(propEmerge),
+            sdEmerge=sd(propEmerge), 
+            minEmerge=min(propEmerge), maxEmerge=max(propEmerge))
+```
+
+# Growth rates  
+## Ideal field conditions  
+```{r growth}
+tom_growth <- tom_height %>% group_by(Plant) %>%
+  
+ggplot(tom_height, aes(x=hgt_15, y=hgt_16-hgt_15)) + geom_point()
+ggplot(tom_height, aes(x=hgt_16, y=hgt_17-hgt_16)) + geom_point()
+```
+
+# Fecundity rates  
+## Tom Lee: Ideal field conditions  
+```{r fecundity}
+tom_fec <- tom_height %>% filter(nFruit > 0)
+ggplot(tom_fec, aes(x=hgt, y=nFruit)) + geom_point() + 
+  stat_smooth(method="lm") +
+  annotate("text", x=min(tom_fec$hgt), y=min(tom_fec$nFruit), 
+           hjust=0, vjust=-1,
+           label=paste0("b: ", 
+                        coef(lm(nFruit ~ hgt, data=tom_fec))[2] %>%
+                          round(3),
+                        "\n", "p: ", 
+                        (lm(nFruit ~ hgt, data=tom_fec) %>% 
+                           summary %>% coef)[2,4] %>%
+                          round(3)))
+ggplot(tom_fec, aes(x=hgt, y=nSeedFruit)) + geom_point() + 
+  stat_smooth(method="lm") +
+  annotate("text", x=min(tom_fec$hgt), y=min(tom_fec$nSeedFruit), 
+           hjust=0, vjust=-1,
+           label=paste0("b: ", 
+                        coef(lm(nSeedFruit ~ hgt, data=tom_fec))[2] %>%
+                          round(3),
+                        "\n", "p: ", 
+                        (lm(nSeedFruit ~ hgt, data=tom_fec) %>% 
+                           summary %>% coef)[2,4] %>%
+                          round(3)))
+ggplot(tom_fec, aes(x=hgt, y=nSeedPlant)) + geom_point() + 
+  stat_smooth(method="lm") +
+  annotate("text", x=min(tom_fec$hgt), y=min(tom_fec$nSeedPlant), 
+           hjust=0, vjust=-1,
+           label=paste0("b: ", 
+                        coef(lm(nSeedPlant ~ hgt, data=tom_fec))[2] %>%
+                          round(3),
+                        "\n", "p: ", 
+                        (lm(nSeedPlant ~ hgt, data=tom_fec) %>% 
+                           summary %>% coef)[2,4] %>%
+                          round(3)))
+```
+
