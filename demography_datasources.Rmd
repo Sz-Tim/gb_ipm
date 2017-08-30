@@ -1,4 +1,4 @@
-str---
+---
 title: "IPM Datasets"
 author: "Tim Szewczyk"
 date: "8/21/2017"
@@ -9,9 +9,14 @@ This RMarkdown file summarizes the various demographic datasources that will inf
 
 ```{r setup, include=FALSE}
 library(sevcheck); library(tidyverse); theme_set(theme_bw()); library(magrittr)
+library(lmerTest)
 tom_height <- read_csv("data/tom_surv_fruit.csv")
+tom_growth <- read_csv("data/tom_growth.csv") %>% 
+  mutate(y1=factor(y1), y2=factor(y2))
 tom_emerge <- read_csv("data/tom_emerge.csv")
 tom_germ <- read_csv("data/tom_germ.csv")
+matt_size <- read_csv("data/fral.tran.df.csv") %>%
+  mutate(nhlc=factor(nhlc, labels=c("Dev", "Dec", "Mxd", "WP")))
 ```
 
 # Germination rates  
@@ -45,15 +50,136 @@ tom_emerge %>% group_by(Treatment) %>%
 
 # Growth rates  
 ## Ideal field conditions  
-```{r growth}
-tom_growth <- tom_height %>% group_by(Plant) %>%
-  
-ggplot(tom_height, aes(x=hgt_15, y=hgt_16-hgt_15)) + geom_point()
-ggplot(tom_height, aes(x=hgt_16, y=hgt_17-hgt_16)) + geom_point()
+```{r growth_tom}
+ggplot(tom_growth, aes(x=hgt_y1, y=hgt_d, colour=y1)) + geom_point() +
+  stat_smooth(method="lm")
+ggplot(tom_growth, aes(x=hgt_y2, y=hgt_d, colour=y1)) + geom_point() +
+  stat_smooth(method="lm")
+
+
+
 ```
+
+## Matt's data  
+```{r growth_matt}
+matt_nhlc <- matt_size %>% filter(!is.na(nhlc)) %>% group_by(nhlc)
+matt_nhlc %>% summarise(nPlant=n_distinct(tag), 
+                        mortality=sum(!is.na(mortality.yr1)),
+                        mn_d_DAH=round(mean(dah.yr1-dah.yr0, na.rm=T),3),
+                        md_d_DAH=median(dah.yr1-dah.yr0, na.rm=T),
+                        sd_d_DAH=round(sd(dah.yr1-dah.yr0, na.rm=T),3),
+                        mn_d_hgt=round(mean(height.yr1-height.yr0, na.rm=T),3),
+                        md_d_hgt=median(height.yr1-height.yr0, na.rm=T),
+                        sd_d_hgt=round(sd(height.yr1-height.yr0, na.rm=T),3),
+                        mn_d_stems=round(mean(stems.yr1-stems.yr0, na.rm=T),3),
+                        md_d_stems=median(stems.yr1-stems.yr0, na.rm=T),
+                        sd_d_stems=round(sd(stems.yr1-stems.yr0, na.rm=T),3))
+
+ggplot(matt_nhlc, aes(x=dah.yr0)) + geom_histogram() + 
+  facet_wrap(~nhlc)
+ggplot(matt_nhlc, aes(x=dah.yr1)) + geom_histogram() + 
+  facet_wrap(~nhlc)
+ggplot(matt_nhlc, aes(x=dah.yr1-dah.yr0)) + geom_histogram() + 
+  geom_vline(xintercept=0, linetype=3, colour="red") + facet_wrap(~nhlc)
+
+ggplot(matt_nhlc, aes(x=height.yr0)) + geom_histogram() + 
+  facet_wrap(~nhlc)
+ggplot(matt_nhlc, aes(x=height.yr1)) + geom_histogram() + 
+  facet_wrap(~nhlc)
+ggplot(matt_nhlc, aes(x=height.yr1-height.yr0)) + geom_histogram() +
+  geom_vline(xintercept=0, linetype=3, colour="red") + facet_wrap(~nhlc)
+
+ggplot(matt_nhlc, aes(x=stems.yr0)) + geom_histogram() + 
+  facet_wrap(~nhlc)
+ggplot(matt_nhlc, aes(x=stems.yr1)) + geom_histogram() + 
+  facet_wrap(~nhlc)
+ggplot(matt_nhlc, aes(x=stems.yr1-stems.yr0)) + geom_histogram() +
+  geom_vline(xintercept=0, linetype=3, colour="red") + facet_wrap(~nhlc)
+
+
+ggplot(matt_nhlc, aes(x=height.yr1, y=dah.yr1, colour=nhlc)) +
+  geom_point() + stat_smooth(method="lm", se=F) + facet_wrap(~site)
+
+```
+
 
 # Fecundity rates  
 ## Tom Lee: Ideal field conditions  
+### Height and fruit production
+There seem to be large differences in the effect of size for first years and second years. While no plants fruited in their first year, the number of fruits produced in year 2 increased sharply with height in year 1. The largest plants at the end of year 1 produced the most fruit in year 2. This effect was moderated in the next year. The larger plants at year 2 produced more fruit in year 3, but not much more. There is no relationship between current height and fruit production. However, when a random effect of individual is included, there is no significant interaction between hgt_y1 and year, but there is a significant effect of hgt_y1. 
+
+```{r hgt_frt}
+hgt1Frt.m <- lmer(nFrt_y2 ~ hgt_y1*y1 + (1|Plant), data=tom_growth)
+summary(hgt1Frt.m)
+ggplot(tom_growth, aes(x=hgt_y1, y=nFrt_y2, colour=y1)) + geom_point() + 
+  stat_smooth(method="lm") +
+  annotate("text", x=min(tom_growth$hgt_y1), y=max(tom_growth$nFrt_y2), 
+           hjust=0, vjust=1,
+           label=paste0("b: ", 
+                        coef(summary(hgt1Frt.m))[2,1] %>% round(3),
+                        "\n", "p: ", 
+                        coef(summary(hgt1Frt.m))[2,5] %>% round(3)))
+hgt2Frt.m <- lmer(nFrt_y2 ~ hgt_y2*y2 + (1|Plant), data=tom_growth)
+summary(hgt2Frt.m)
+ggplot(tom_growth, aes(x=hgt_y2, y=nFrt_y2, colour=y2)) + geom_point() + 
+  stat_smooth(method="lm") +
+  annotate("text", x=min(tom_growth$hgt_y2), y=max(tom_growth$nFrt_y2), 
+           hjust=0, vjust=1,
+           label=paste0("b: ", 
+                        coef(summary(hgt2Frt.m))[2,1] %>% round(3),
+                        "\n", "p: ", 
+                        coef(summary(hgt2Frt.m))[2,5] %>% round(3)))
+```
+
+There is no effect of height on the number of seeds per fruit.
+```{r hgt_sd_frt}
+hgt1SdFrt.m <- lmer(nSdFrt_y2 ~ hgt_y1*y1 + (1|Plant), data=tom_growth)
+summary(hgt1SdFrt.m)
+ggplot(tom_growth, aes(x=hgt_y1, y=nSdFrt_y2, colour=y1)) + geom_point() + 
+  stat_smooth(method="lm") +
+  annotate("text", x=min(tom_growth$hgt_y1), y=max(tom_growth$nSdFrt_y2), 
+           hjust=0, vjust=1,
+           label=paste0("b: ", 
+                        coef(summary(hgt1SdFrt.m))[2,1] %>% round(3),
+                        "\n", "p: ", 
+                        coef(summary(hgt1SdFrt.m))[2,5] %>% round(3)))
+hgt2SdFrt.m <- lmer(nSdFrt_y2 ~ hgt_y2*y2 + (1|Plant), data=tom_growth)
+summary(hgt2SdFrt.m)
+ggplot(tom_growth, aes(x=hgt_y2, y=nSdFrt_y2, colour=y2)) + geom_point() + 
+  stat_smooth(method="lm") +
+  annotate("text", x=min(tom_growth$hgt_y2), y=max(tom_growth$nSdFrt_y2), 
+           hjust=0, vjust=1,
+           label=paste0("b: ", 
+                        coef(summary(hgt2SdFrt.m))[2,1] %>% round(3),
+                        "\n", "p: ", 
+                        coef(summary(hgt2SdFrt.m))[2,5] %>% round(3)))
+```
+
+Height in year 1 is a significant predictor of total seed production in year 2, with an increase of 66.6 seeds for each cm in height. This is due to increased fruit production rather than an increase in the number of seeds per fruit.
+```{r hgt_sd}
+hgt1Sd.m <- lmer(nSd_y2 ~ hgt_y1*y1 + (1|Plant), data=tom_growth)
+summary(hgt1Sd.m)
+ggplot(tom_growth, aes(x=hgt_y1, y=nSd_y2, colour=y1)) + geom_point() + 
+  stat_smooth(method="lm") +
+  annotate("text", x=min(tom_growth$hgt_y1), y=max(tom_growth$nSd_y2), 
+           hjust=0, vjust=1,
+           label=paste0("b: ", 
+                        coef(summary(hgt1Sd.m))[2,1] %>% round(3),
+                        "\n", "p: ", 
+                        coef(summary(hgt1Sd.m))[2,5] %>% round(3)))
+hgt2Sd.m <- lmer(nSd_y2 ~ hgt_y2*y2 + (1|Plant), data=tom_growth)
+summary(hgt2Sd.m)
+ggplot(tom_growth, aes(x=hgt_y2, y=nSd_y2, colour=y2)) + geom_point() + 
+  stat_smooth(method="lm") +
+  annotate("text", x=min(tom_growth$hgt_y2), y=max(tom_growth$nSd_y2), 
+           hjust=0, vjust=1,
+           label=paste0("b: ", 
+                        coef(summary(hgt2Sd.m))[2,1] %>% round(3),
+                        "\n", "p: ", 
+                        coef(summary(hgt2Sd.m))[2,5] %>% round(3)))
+```
+
+
 ```{r fecundity}
 tom_fec <- tom_height %>% filter(nFruit > 0)
 ggplot(tom_fec, aes(x=hgt, y=nFruit)) + geom_point() + 
@@ -89,5 +215,17 @@ ggplot(tom_fec, aes(x=hgt, y=nSeedPlant)) + geom_point() +
                         (lm(nSeedPlant ~ hgt, data=tom_fec) %>% 
                            summary %>% coef)[2,4] %>%
                           round(3)))
+ggplot(tom_growth, aes(x=hgt_y1, y=nFrt_d, colour=y1)) + geom_point() +
+  stat_smooth(method="lm")
+ggplot(tom_growth, aes(x=hgt_y2, y=nFrt_d, colour=y1)) + geom_point() +
+  stat_smooth(method="lm")
+ggplot(tom_growth, aes(x=hgt_y1, y=nSdFrt_d, colour=y1)) + geom_point() +
+  stat_smooth(method="lm")
+ggplot(tom_growth, aes(x=hgt_y2, y=nSdFrt_d, colour=y1)) + geom_point() +
+  stat_smooth(method="lm")
+ggplot(tom_growth, aes(x=hgt_y1, y=nSd_d, colour=y1)) + geom_point() +
+  stat_smooth(method="lm")
+ggplot(tom_growth, aes(x=hgt_y2, y=nSd_d, colour=y1)) + geom_point() +
+  stat_smooth(method="lm")
 ```
 
