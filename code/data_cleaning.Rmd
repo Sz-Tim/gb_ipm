@@ -16,6 +16,7 @@ matt_gps <- read_csv(paste0(matt_dir, "data/gps/WFF_nhlc.csv")) %>%
               select(X, Y, name, nhlcagg)) %>%
   mutate(name=stringr::str_to_lower(name))
 matt_size <- read_csv(paste0(matt_dir, "outputs/fral.tran.df.csv"))
+matt_dens <- read_csv(paste0(matt_dir, "outputs/fral.df.ann.csv"))
 ```
 
 
@@ -24,5 +25,9 @@ matt_size %<>%
   mutate(name=paste0(site, plot)) %>%
   mutate(nhlc=matt_gps$nhlcagg[match(.$name, matt_gps$name)]) %T>%
   write_csv("data/fral.tran.df.csv")
+matt_dens %<>%
+  mutate(name=paste0(site, plot)) %>%
+  mutate(nhlc=matt_gps$nhlcagg[match(.$name, matt_gps$name)]) %T>%
+  write_csv("data/fral.df.ann.csv")
 ```
 
