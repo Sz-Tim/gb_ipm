@@ -8,8 +8,9 @@ output: html_document
 This RMarkdown file summarizes the various demographic datasources that will inform the glossy buckthorn IPM. The bulk of the data come from Tom Lee's field and lab experiments or from Matt Aiello-Lammens' dissertation chapter where he constructed a glossy buckthorn IPM using various field measurements and literature-based assumptions. The current plan is to vary justified vital rates based on landcover type (developed, deciduous, mixed, evergreen, white pine, other). 
 
 ```{r setup, include=FALSE}
-library(sevcheck); library(tidyverse); theme_set(theme_bw()); library(magrittr)
-library(lmerTest)
+library(sevcheck); p_load("tidyverse", "magrittr", "lmerTest")
+theme_set(theme_bw())
+
 tom_height <- read_csv("data/tom_surv_fruit.csv")
 tom_growth <- read_csv("data/tom_growth.csv") %>% 
   mutate(y1=factor(y1), y2=factor(y2))
@@ -17,6 +18,7 @@ tom_emerge <- read_csv("data/tom_emerge.csv")
 tom_germ <- read_csv("data/tom_germ.csv")
 matt_size <- read_csv("data/fral.tran.df.csv") %>%
   mutate(nhlc=factor(nhlc, labels=c("Dev", "Dec", "Mxd", "WP")))
+matt_dens <- read_csv("data/fral.df.ann.csv")
 ```
 
 # Germination rates  
@@ -50,11 +52,23 @@ tom_emerge %>% group_by(Treatment) %>%
 
 # Growth rates  
 ## Ideal field conditions  
+There is no relationship between height in year 2 and height in year 1 once both year and individual are controlled for. So does that mean that there are just differences in the growth rates of individuals? No significant effect of hght_y1, year, or their interaction. Without the random effect of individual, hgt_y2 ~ hgt_y1 is significant, but still not hgt_d ~ hgt_y1. So larger individuals don't seem to be growing at a faster rate, but there is variation among individuals. That probably makes it simpler if we can assume that the growth rate is essentially constant regardless of size. But eventually there needs to be a cap... That might need to come from Matt's data since Tom only has up to year 3.
 ```{r growth_tom}
+grth1.m <- lmer(hgt_d ~ hgt_y1*y1 + (1|Plant), data=tom_growth)
+summary(grth1.m)
 ggplot(tom_growth, aes(x=hgt_y1, y=hgt_d, colour=y1)) + geom_point() +
   stat_smooth(method="lm")
-ggplot(tom_growth, aes(x=hgt_y2, y=hgt_d, colour=y1)) + geom_point() +
+summary(lm(hgt_d ~ hgt_y1*y1, data=tom_growth))
+summary(lm(hgt_d ~ hgt_y1 + y1, data=tom_growth))
+summary(lm(hgt_d ~ y1, data=tom_growth))
+
+grth2.m <- lmer(hgt_y2 ~ hgt_y1*y1 + (1|Plant), data=tom_growth)
+summary(grth2.m)
+ggplot(tom_growth, aes(x=hgt_y1, y=hgt_y2, colour=y1)) + geom_point() +
   stat_smooth(method="lm")
+summary(lm(hgt_y2 ~ hgt_y1*y1, data=tom_growth))
+summary(lm(hgt_y2 ~ hgt_y1 + y1, data=tom_growth))
+summary(lm(hgt_y2 ~ hgt_y1, data=tom_growth))
 
 
 
@@ -111,8 +125,9 @@ There seem to be large differences in the effect of size for first years and sec
 ```{r hgt_frt}
 hgt1Frt.m <- lmer(nFrt_y2 ~ hgt_y1*y1 + (1|Plant), data=tom_growth)
 summary(hgt1Frt.m)
-ggplot(tom_growth, aes(x=hgt_y1, y=nFrt_y2, colour=y1)) + geom_point() + 
-  stat_smooth(method="lm") +
+ggplot(tom_growth, aes(x=hgt_y1, y=nFrt_y2)) +
+  geom_point(aes(colour=y1)) + stat_smooth(method="lm", colour="gray30") + 
+  stat_smooth(aes(colour=y1), method="lm", se=FALSE) +
   annotate("text", x=min(tom_growth$hgt_y1), y=max(tom_growth$nFrt_y2), 
            hjust=0, vjust=1,
            label=paste0("b: ", 
@@ -121,8 +136,9 @@ ggplot(tom_growth, aes(x=hgt_y1, y=nFrt_y2, colour=y1)) + geom_point() +
                         coef(summary(hgt1Frt.m))[2,5] %>% round(3)))
 hgt2Frt.m <- lmer(nFrt_y2 ~ hgt_y2*y2 + (1|Plant), data=tom_growth)
 summary(hgt2Frt.m)
-ggplot(tom_growth, aes(x=hgt_y2, y=nFrt_y2, colour=y2)) + geom_point() + 
-  stat_smooth(method="lm") +
+ggplot(tom_growth, aes(x=hgt_y2, y=nFrt_y2)) +
+  geom_point(aes(colour=y2)) + stat_smooth(method="lm", colour="gray30") + 
+  stat_smooth(aes(colour=y2), method="lm", se=FALSE) +
   annotate("text", x=min(tom_growth$hgt_y2), y=max(tom_growth$nFrt_y2), 
            hjust=0, vjust=1,
            label=paste0("b: ", 
@@ -135,8 +151,9 @@ There is no effect of height on the number of seeds per fruit.
 ```{r hgt_sd_frt}
 hgt1SdFrt.m <- lmer(nSdFrt_y2 ~ hgt_y1*y1 + (1|Plant), data=tom_growth)
 summary(hgt1SdFrt.m)
-ggplot(tom_growth, aes(x=hgt_y1, y=nSdFrt_y2, colour=y1)) + geom_point() + 
-  stat_smooth(method="lm") +
+ggplot(tom_growth, aes(x=hgt_y1, y=nSdFrt_y2)) +
+  geom_point(aes(colour=y1)) + stat_smooth(method="lm", colour="gray30") + 
+  stat_smooth(aes(colour=y1), method="lm", se=FALSE) +
   annotate("text", x=min(tom_growth$hgt_y1), y=max(tom_growth$nSdFrt_y2), 
            hjust=0, vjust=1,
            label=paste0("b: ", 
@@ -145,8 +162,9 @@ ggplot(tom_growth, aes(x=hgt_y1, y=nSdFrt_y2, colour=y1)) + geom_point() +
                         coef(summary(hgt1SdFrt.m))[2,5] %>% round(3)))
 hgt2SdFrt.m <- lmer(nSdFrt_y2 ~ hgt_y2*y2 + (1|Plant), data=tom_growth)
 summary(hgt2SdFrt.m)
-ggplot(tom_growth, aes(x=hgt_y2, y=nSdFrt_y2, colour=y2)) + geom_point() + 
-  stat_smooth(method="lm") +
+ggplot(tom_growth, aes(x=hgt_y2, y=nSdFrt_y2)) +
+  geom_point(aes(colour=y2)) + stat_smooth(method="lm", colour="gray30") + 
+  stat_smooth(aes(colour=y2), method="lm", se=FALSE) +
   annotate("text", x=min(tom_growth$hgt_y2), y=max(tom_growth$nSdFrt_y2), 
            hjust=0, vjust=1,
            label=paste0("b: ", 
@@ -159,8 +177,9 @@ Height in year 1 is a significant predictor of total seed production in year 2, 
 ```{r hgt_sd}
 hgt1Sd.m <- lmer(nSd_y2 ~ hgt_y1*y1 + (1|Plant), data=tom_growth)
 summary(hgt1Sd.m)
-ggplot(tom_growth, aes(x=hgt_y1, y=nSd_y2, colour=y1)) + geom_point() + 
-  stat_smooth(method="lm") +
+ggplot(tom_growth, aes(x=hgt_y1, y=nSd_y2)) +
+  geom_point(aes(colour=y1)) + stat_smooth(method="lm", colour="gray30") + 
+  stat_smooth(aes(colour=y1), method="lm", se=FALSE) +
   annotate("text", x=min(tom_growth$hgt_y1), y=max(tom_growth$nSd_y2), 
            hjust=0, vjust=1,
            label=paste0("b: ", 
@@ -169,8 +188,9 @@ ggplot(tom_growth, aes(x=hgt_y1, y=nSd_y2, colour=y1)) + geom_point() +
                         coef(summary(hgt1Sd.m))[2,5] %>% round(3)))
 hgt2Sd.m <- lmer(nSd_y2 ~ hgt_y2*y2 + (1|Plant), data=tom_growth)
 summary(hgt2Sd.m)
-ggplot(tom_growth, aes(x=hgt_y2, y=nSd_y2, colour=y2)) + geom_point() + 
-  stat_smooth(method="lm") +
+ggplot(tom_growth, aes(x=hgt_y2, y=nSd_y2)) +
+  geom_point(aes(colour=y2)) + stat_smooth(method="lm", colour="gray30") + 
+  stat_smooth(aes(colour=y2), method="lm", se=FALSE) +
   annotate("text", x=min(tom_growth$hgt_y2), y=max(tom_growth$nSd_y2), 
            hjust=0, vjust=1,
            label=paste0("b: ", 
@@ -227,5 +247,24 @@ ggplot(tom_growth, aes(x=hgt_y1, y=nSd_d, colour=y1)) + geom_point() +
   stat_smooth(method="lm")
 ggplot(tom_growth, aes(x=hgt_y2, y=nSd_d, colour=y1)) + geom_point() +
   stat_smooth(method="lm")
+```
+
+
+
+# Density
+```{r density}
+ggplot(matt_size, aes(x=densEffect.yr0, y=dens.cont.yr0)) + geom_point()
+ggplot(matt_size, aes(x=densEffect.yr0, y=height.yr1-height.yr0)) + geom_point()
+ggplot(matt_size, aes(x=densEffect.yr0, y=height.yr1-height.yr0)) + geom_point()
+ggplot(matt_dens, aes(x=densEffect, y=fruit)) + geom_point()
+ggplot(matt_dens %>% filter(fruit > 0 & !is.na(nhlc)), 
+       aes(x=plot.dens, y=log(fruit))) + 
+  geom_point(alpha=0.5) + stat_smooth(method="lm") + facet_wrap(~nhlc)
+ggplot(matt_dens %>% filter(fruit > 0 & !is.na(nhlc)), 
+       aes(x=densEffect, y=log(fruit))) + 
+  geom_point(alpha=0.5) + stat_smooth(method="lm") + facet_wrap(~nhlc)
+ggplot(matt_dens %>% filter(fruit > 0 & !is.na(nhlc)), 
+       aes(x=dens.dahEffect, y=log(fruit))) + 
+  geom_point(alpha=0.5) + stat_smooth(method="lm") + facet_wrap(~nhlc)
 ```
 
